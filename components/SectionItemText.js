@@ -10,7 +10,6 @@ class SectionItemText extends Component {
 
   shouldComponentUpdate(nextProps) {
     if (this.props.style.fontSize !== nextProps.style.fontSize) {
-        console.log('UPDATE: ', nextProps.children)
         return true;
     }
     return false;
