@@ -10,6 +10,7 @@ import ReactNative, {
   Text,
   NativeModules,
 } from 'react-native';
+import SectionItemText from './SectionItemText'
 
 const { UIManager } = NativeModules;
 
@@ -25,6 +26,11 @@ export default class SectionList extends Component {
     this.resetSection = this.resetSection.bind(this);
     this.detectAndScrollToSection = this.detectAndScrollToSection.bind(this);
     this.lastSelectedIndex = null;
+
+    this.state = {
+      sectionStyles: [],
+      sectionBaseStyles: [],
+    }
   }
 
   onSectionSelect(sectionId, fromTouch) {
@@ -37,6 +43,63 @@ export default class SectionList extends Component {
 
   resetSection() {
     this.lastSelectedIndex = null;
+    this.setState({
+      sectionStyles: this.state.sectionBaseStyles,
+    })
+  }
+
+  highLightSection(index) {
+    const sectionStyles = this.state.sectionBaseStyles.slice();
+    const toBeUpdatedMatrix = [-3, -2, -1, 0, 1, 2, 3].reduce((properIdxs, offIdx) => {
+      const properIdx = index + offIdx;
+      if (properIdx >= 0) {
+        let ratio = 2.4
+        let fontRatio = 1.8
+        switch (Math.abs(offIdx)) {
+          case 3:
+            ratio = 1.2;
+            fontRatio = 1.2;
+            break;
+          case 2:
+            ratio = 1.6;
+            fontRatio = 1.4;
+            break;
+          case 1:
+            ratio = 2;
+            fontRatio = 1.6;
+            break;
+          default:
+            ratio = 2.4;
+            fontRatio = 1.8;
+        }
+        properIdxs.push({
+          offIdx,
+          index: properIdx,
+          ratio,
+          fontRatio,
+        })
+      }
+      return properIdxs;
+    }, [])
+
+    toBeUpdatedMatrix.forEach((e) => {
+      sectionStyles[e.index] = {
+        fontSize: 11 * e.fontRatio,
+        lineHeight: 20,
+        width: 40 * e.ratio,
+        textAlign: 'left',
+      };
+
+      if (e.offIdx === 0) {
+        sectionStyles[e.index] = Object.assign(sectionStyles[e.index], {
+          fontWeight: 'bold',
+        })
+      }
+    });
+
+    this.setState({
+      sectionStyles,
+    })
   }
 
   detectAndScrollToSection(e) {
@@ -63,6 +126,7 @@ export default class SectionList extends Component {
     }
     let index = Math.floor((targetY - y) / height);
     index = Math.min(index, this.props.sections.length - 1);
+    this.highLightSection(index);
     if (this.lastSelectedIndex !== index && this.props.data[this.props.sections[index]].length) {
       this.lastSelectedIndex = index;
       this.onSectionSelect(this.props.sections[index], true);
@@ -86,11 +150,21 @@ export default class SectionList extends Component {
     }, 0);
   }
 
+  componentWillMount() {
+    const sectionBaseStyles = this.props.sections.map((section, index) => ({
+      fontSize: 11,
+    }));
+    this.setState({
+      sectionStyles: sectionBaseStyles,
+      sectionBaseStyles,
+    });
+  }
+
   componentDidMount() {
     this.fixSectionItemMeasure();
   }
 
-  // fix bug when change data 
+  // fix bug when change data
   componentDidUpdate() {
     this.fixSectionItemMeasure();
   }
@@ -110,6 +184,8 @@ export default class SectionList extends Component {
         styles.text :
         styles.inactivetext;
 
+      const flattenStyle = StyleSheet.flatten([textStyle, this.state.sectionStyles[index]]);
+
       const child = SectionComponent ?
         <SectionComponent
           sectionId={section}
@@ -117,7 +193,7 @@ export default class SectionList extends Component {
         /> :
         <View
           style={styles.item}>
-          <Text style={[textStyle, this.props.fontStyle]}>{title}</Text>
+          <SectionItemText style={flattenStyle}>{title}</SectionItemText>
         </View>;
 
       //if(index){
@@ -203,12 +279,17 @@ const styles = StyleSheet.create({
   },
 
   item: {
-    padding: 0
+    padding: 0,
   },
 
   text: {
-    fontWeight: '700',
-    color: '#008fff'
+    fontFamily: 'NotoSansCJKjp-Regular',
+    color: '#84bb32',
+    textAlign: 'center',
+    width: 20,
+    fontSize: 11,
+    lineHeight: 14,
+    fontWeight: 'normal',
   },
 
   inactivetext: {
