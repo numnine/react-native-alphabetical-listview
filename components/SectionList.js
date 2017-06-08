@@ -7,8 +7,8 @@ import React, {
 import ReactNative, {
   StyleSheet,
   View,
-  Text,
   NativeModules,
+  Dimensions,
 } from 'react-native';
 import SectionItemText from './SectionItemText'
 
@@ -16,6 +16,8 @@ const { UIManager } = NativeModules;
 
 const noop = () => {};
 const returnTrue = () => true;
+
+let scrollTimeOut = null;
 
 export default class SectionList extends Component {
 
@@ -28,6 +30,7 @@ export default class SectionList extends Component {
     this.lastSelectedIndex = null;
 
     this.state = {
+      sectionItemBaseStyle: {},
       sectionStyles: [],
       sectionBaseStyles: [],
     }
@@ -48,54 +51,41 @@ export default class SectionList extends Component {
     })
   }
 
-  highLightSection(index) {
+  highLightSection(index, pageX) {
     const sectionStyles = this.state.sectionBaseStyles.slice();
-    const toBeUpdatedMatrix = [-3, -2, -1, 0, 1, 2, 3].reduce((properIdxs, offIdx) => {
-      const properIdx = index + offIdx;
-      if (properIdx >= 0) {
-        let ratio = 2.4
-        let fontRatio = 1.8
-        switch (Math.abs(offIdx)) {
-          case 3:
-            ratio = 1.2;
-            fontRatio = 1.2;
-            break;
-          case 2:
-            ratio = 1.6;
-            fontRatio = 1.4;
-            break;
-          case 1:
-            ratio = 2;
-            fontRatio = 1.6;
-            break;
-          default:
-            ratio = 2.4;
-            fontRatio = 1.8;
-        }
-        properIdxs.push({
-          offIdx,
-          index: properIdx,
-          ratio,
-          fontRatio,
-        })
-      }
-      return properIdxs;
-    }, [])
+    const wWidth = Dimensions.get('window').width
+    const itemWidth = this.state.sectionItemBaseStyle.width;
+    let [count, step] = [0, 10];
+    let [centerX, radius, angle] = [wWidth - itemWidth, wWidth - pageX, 180]
 
-    toBeUpdatedMatrix.forEach((e) => {
-      sectionStyles[e.index] = {
-        fontSize: 11 * e.fontRatio,
-        lineHeight: 20,
-        width: 40 * e.ratio,
+    radius = radius > wWidth / 2 ? wWidth / 2 : radius
+    radius += 40
+
+    while (angle > 90) {
+      angle -= step
+      const x = centerX + radius * Math.cos(-angle * Math.PI / 180);
+      const i1 = index - count;
+      const i2 = index + count;
+
+      const newStyle = StyleSheet.flatten([this.state.sectionItemBaseStyle, {
+        width: Math.round(wWidth - x),
         textAlign: 'left',
-      };
+      }]);
 
-      if (e.offIdx === 0) {
-        sectionStyles[e.index] = Object.assign(sectionStyles[e.index], {
-          fontWeight: 'bold',
-        })
+      if(count === 0) {
+        newStyle['fontSize'] = newStyle.fontSize * 2;
+        newStyle['fontWeight'] = 'bold';
       }
-    });
+
+      if(sectionStyles[i1]) {
+        sectionStyles[i1] = newStyle
+      }
+      if(i1 !== i2 && sectionStyles[i2]) {
+        sectionStyles[i2] = newStyle
+      }
+
+      count++
+    }
 
     this.setState({
       sectionStyles,
@@ -104,32 +94,22 @@ export default class SectionList extends Component {
 
   detectAndScrollToSection(e) {
     const ev = e.nativeEvent.touches[0];
-    //var rect = {width:1, height:1, x: ev.locationX, y: ev.locationY};
-    //var rect = [ev.locationX, ev.locationY];
-
-    //UIManager.measureViewsInRect(rect, e.target, noop, (frames) => {
-    //  if (frames.length) {
-    //    var index = frames[0].index;
-    //    if (this.lastSelectedIndex !== index) {
-    //      this.lastSelectedIndex = index;
-    //      this.onSectionSelect(this.props.sections[index], true);
-    //    }
-    //  }
-    //});
-    //UIManager.findSubviewIn(e.target, rect, viewTag => {
-      //this.onSectionSelect(view, true);
-    //})
     const targetY = ev.pageY;
-    const { y, width, height } = this.measure;
+    const { y, width, height, pageX } = this.measure;
     if(!y || targetY < y){
       return;
     }
     let index = Math.floor((targetY - y) / height);
     index = Math.min(index, this.props.sections.length - 1);
-    this.highLightSection(index);
+    this.highLightSection(index, ev.pageX);
     if (this.lastSelectedIndex !== index && this.props.data[this.props.sections[index]].length) {
       this.lastSelectedIndex = index;
-      this.onSectionSelect(this.props.sections[index], true);
+      if (scrollTimeOut) clearTimeout(scrollTimeOut)
+
+      scrollTimeOut = setTimeout(() => {
+        this.onSectionSelect(this.props.sections[index], true);
+      }, 100);
+
     }
   }
 
@@ -140,7 +120,6 @@ export default class SectionList extends Component {
     }
     this.measureTimer = setTimeout(() => {
       sectionItem.measure((x, y, width, height, pageX, pageY) => {
-        //console.log([x, y, width, height, pageX, pageY]);
         this.measure = {
           y: pageY,
           width,
@@ -151,10 +130,10 @@ export default class SectionList extends Component {
   }
 
   componentWillMount() {
-    const sectionBaseStyles = this.props.sections.map((section, index) => ({
-      fontSize: 11,
-    }));
+    const baseStyle = StyleSheet.flatten([styles.text, this.props.fontStyle]);
+    const sectionBaseStyles = this.props.sections.map((section, index) => baseStyle);
     this.setState({
+      sectionItemBaseStyle: baseStyle,
       sectionStyles: sectionBaseStyles,
       sectionBaseStyles,
     });
@@ -180,38 +159,11 @@ export default class SectionList extends Component {
         this.props.getSectionListTitle(section) :
         section;
 
-      const textStyle = this.props.data[section].length ?
-        styles.text :
-        styles.inactivetext;
-
-      const flattenStyle = StyleSheet.flatten([textStyle, this.state.sectionStyles[index]]);
-
-      const child = SectionComponent ?
-        <SectionComponent
-          sectionId={section}
-          title={title}
-        /> :
-        <View
-          style={styles.item}>
-          <SectionItemText style={flattenStyle}>{title}</SectionItemText>
-        </View>;
-
-      //if(index){
         return (
           <View key={index} ref={'sectionItem' + index} pointerEvents="none">
-            {child}
+            <SectionItemText style={this.state.sectionStyles[index]}>{title}</SectionItemText>
           </View>
         );
-      //}
-      //else{
-      //  return (
-      //    <View key={index} ref={'sectionItem' + index} pointerEvents="none"
-      //          onLayout={e => {console.log(e.nativeEvent.layout)}}>
-      //      {child}
-      //    </View>
-      //  );
-      //
-      //}
     });
 
     return (
@@ -283,13 +235,9 @@ const styles = StyleSheet.create({
   },
 
   text: {
-    fontFamily: 'NotoSansCJKjp-Regular',
-    color: '#84bb32',
+    color: '#008fff',
     textAlign: 'center',
     width: 20,
-    fontSize: 11,
-    lineHeight: 14,
-    fontWeight: 'normal',
   },
 
   inactivetext: {

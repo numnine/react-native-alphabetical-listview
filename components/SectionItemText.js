@@ -9,8 +9,11 @@ import {
 class SectionItemText extends Component {
 
   shouldComponentUpdate(nextProps) {
-    if (this.props.style.fontSize !== nextProps.style.fontSize) {
-        return true;
+    const [curStyle, nextStyle] = [this.props.style, nextProps.style];
+    if (curStyle.width !== nextStyle.width
+      || curStyle.textAlign !== nextStyle.textAlign
+      || curStyle.fontSize !== nextStyle.fontSize) {
+      return true;
     }
     return false;
   }
