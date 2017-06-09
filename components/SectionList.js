@@ -51,15 +51,12 @@ export default class SectionList extends Component {
     })
   }
 
-  highLightSection(index, pageX) {
+  highLightSection(index) {
     const sectionStyles = this.state.sectionBaseStyles.slice();
     const wWidth = Dimensions.get('window').width
     const itemWidth = this.state.sectionItemBaseStyle.width;
     let [count, step] = [0, 10];
-    let [centerX, radius, angle] = [wWidth - itemWidth, wWidth - pageX, 180]
-
-    radius = radius > wWidth / 2 ? wWidth / 2 : radius
-    radius += 40
+    let [centerX, radius, angle] = [wWidth - itemWidth, itemWidth + 40, 180]
 
     while (angle > 90) {
       angle -= step
@@ -104,12 +101,7 @@ export default class SectionList extends Component {
     this.highLightSection(index, ev.pageX);
     if (this.lastSelectedIndex !== index && this.props.data[this.props.sections[index]].length) {
       this.lastSelectedIndex = index;
-      if (scrollTimeOut) clearTimeout(scrollTimeOut)
-
-      scrollTimeOut = setTimeout(() => {
-        this.onSectionSelect(this.props.sections[index], true);
-      }, 100);
-
+      this.onSectionSelect(this.props.sections[index], true);
     }
   }
 
